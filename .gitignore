@@ -1,0 +1,22 @@
+# Generated outputs
+output/
+
+# Local input files, not redistributed (third-party licences)
+# NB: frozen snapshots under docs/ are committed on purpose (see docs/SNAPSHOT.md)
+fixtures/*.csv
+data/*.csv
+
+# Secrets — never commit
+.env
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
