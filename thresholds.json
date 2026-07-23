@@ -1,0 +1,410 @@
+{
+  "_meta": {
+    "version": "1.1.0",
+    "date": "2026-07-11",
+    "description": "Eco3min macro regime classification threshold table. Version this file with semantic versioning. Any modification = version bump + changelog entry. Reproducibility depends on threshold immutability for a given version.",
+    "license": "CC-BY 4.0",
+    "changelog": [
+      {
+        "version": "1.1.0",
+        "date": "2026-07-11",
+        "note": "Calibration audit by full-grid backtest 1968-2026 (sensitivity sweeps, episode scoring against a pre-registered ground-truth matrix, calibration/validation split by episode). ALL NUMERIC THRESHOLDS CONFIRMED UNCHANGED: G+ +0.10 (grid -0.05..+0.20: no episode discrimination; trades G_plus share 52->28% vs Transition share 15->33%); G- -0.50 (grid -0.30..-0.80 step 0.05: NBER capture 8/8 at EVERY value because entries are gate/threshold redundant; -0.50 dominates on latency, 2001: 0 months vs 3 at -0.70 and 1990-91: 3 vs 4, with maximum robustness margin to the 2022/2024 non-recession minima -0.34/-0.31; -0.35 rejected, margin 0.01-0.04 fragile to revisions); I+ 2.75 (2021 switch Oct-Nov, zero I_plus 2010-2019 at all tested values, 99% Grande Inflation coverage); I- 1.50 (unique value keeping 2013-2016 at 92% I_neutral while covering the Dec 2009-Apr 2011 deflation-risk episode 17/17 months; 1.75 flips 2013-16 to 96% I_minus, 1.25 loses 3 episode months); NFCI -0.50/+0.50/+1.50 (acute +1.50 uniquely yields GFC 7/7 acute months and ZERO stray acute post-1990; +1.25 adds 1 stray, +1.75 loses 1 GFC month); confirmation_months 2 (1 and 2 indistinguishable on history - MA3 smoothing; 3 degrades: state carry-over artifacts, +9 FP months, +latency). TWO BEHAVIOURAL CHANGES: (1) Sahm gate LEVEL rule -> UPWARD-CROSSING (edge) trigger. Entry unchanged (immediate G_minus on crossing 0.50; 8/8 captures, identical latencies avg 2.8 / max 4 months); persistence now governed by the normal state machine. Removes post-recession tails: false-positive G_minus months 55 -> 4, out-of-recession Stagflation months 19 -> 2; corrects published history rows 2009-09..2010-07 (Slowdown -> Transition), 2020-08..2021-04 (Slowdown -> Balanced Expansion), 2024-09..2024-10 (Stagflation -> Inflationary Pressure). Residual documented: Stagflation 2024-07/08 (real-time Sahm 0.53-0.57 did fire), Slowdown 1976-11/12 (Sahm touched exactly 0.50), and a 4-month G_neutral interlude inside the 1970 recession (degraded-mode ambiguity; an equivalent mid-recession dip already existed in 1973-75 under v1.0.0). (2) headline_underlying_divergence Brent trigger +20% -> dedicated +40% (HUD_BRENT_SHOCK), decoupled from the commodity_channel qualifier (unchanged at +/-20): activation frequency post-1988 falls 26.0% -> 17.9% of months, every genuine shock episode preserved incl. March-May 2026. Current verdict impact: NONE (Transition / accommodating / flag off before and after). See backtest_limitations."
+      },
+      {
+        "version": "1.0.0",
+        "date": "2026-05-26",
+        "note": "Initial calibrated release. All PENDING_CALIBRATION values resolved from full historical distributions. Corrections vs thresholds_spec.json: (1) NFCI COVID/2022 episode references corrected — peak weekly NFCI in March 2020 was +0.27, never +2.0; 2022 NFCI never exceeded -0.10, never Restrictive. (2) CFNAI-MA3 G- percentile corrected to 10.6th, not 20-25th; value retained to block 2022 false positive. (3) PCE 2013-2015 reclassified as I_neutral in validation — Trimmed Mean was 1.49-1.72%, not I_minus. (4) Momentum override PCE explicitly excluded per architecture decision."
+      }
+    ]
+  },
+
+  "growth_axis": {
+    "primary_input": "CFNAI-MA3",
+    "fred_code": "CFNAI",
+    "treatment": "3-month moving average of monthly CFNAI",
+    "states": {
+      "G_plus": {
+        "condition": "CFNAI_MA3 > 0.10",
+        "value": 0.10,
+        "percentile": "55th percentile of 1967-2026 CFNAI-MA3 distribution (707 obs). 45% of months classify as G_plus.",
+        "basis": "Buffers the Chicago Fed zero-trend boundary against noise. Validated: G_plus confirmed throughout 2021 (CFNAI-MA3 range +0.22 to +0.61) and H1 2022 (range +0.26). Does not trigger in late 2022-2024 slowdown (confirmed).",
+        "status": "CALIBRATED"
+      },
+      "G_neutral": {
+        "condition": "CFNAI_MA3 between -0.50 and 0.10 inclusive",
+        "basis": "Transition band. Captures 2022 (-0.22 to +0.26 range, never G_minus) and 2024-2026 slowdown (-0.26 to +0.03 range).",
+        "status": "CALIBRATED"
+      },
+      "G_minus": {
+        "condition": "CFNAI_MA3 < -0.50",
+        "value": -0.50,
+        "percentile": "10.6th percentile of 1967-2026 CFNAI-MA3 distribution. Note: spec estimated 20-25th percentile — incorrect. The 20th percentile is -0.23, the 10th is -0.53. Value retained at -0.50 because: (a) does not trigger in 2022 non-recession (min 2022 = -0.34) (confirmed); (b) triggers in GFC (March 2008, 3 months after NBER December 2007 start — documented as ambiguous lag, not spec failure); (c) triggers immediately in COVID via Sahm gate override.",
+        "basis": "Sole value that simultaneously blocks the 2022 Stagflation false positive and confirms GFC 2008-2009. The 3-month lag vs NBER in 2007-2008 is documented as ambiguity, not a calibration error — the Sahm gate handles fast-onset recessions (COVID 2020).",
+        "episode_validation": {
+          "GFC_2008": "CFNAI-MA3 < -0.50 from March 2008 (3 months after NBER start Dec 2007). Lag documented as ambiguity. (confirmed) confirms eventually.",
+          "COVID_2020": "Sahm gate triggers immediately (Feb/Mar 2020). CFNAI-MA3 itself reaches -1.52 in March 2020, -7.53 in April 2020. (confirmed)",
+          "2022_non_recession": "CFNAI-MA3 minimum in 2022 = -0.34 (December 2022 on the July 2026 vintage; June 2022 reads -0.22 — CFNAI is revised, the monthly attribution moves across vintages). Never crosses -0.50. No G_minus, no Stagflation. (confirmed)"
+        },
+        "status": "CALIBRATED"
+      }
+    },
+    "secondary_gates": {
+      "sahm_recession_override": {
+        "input": "SAHMREALTIME",
+        "fred_code": "SAHMREALTIME",
+        "threshold": 0.50,
+        "direction": ">=",
+        "effect": "v1.1.0 EDGE TRIGGER: immediate G_minus on the UPWARD CROSSING of the threshold, regardless of CFNAI-MA3 — entry bypasses hysteresis entirely (unchanged vs v1.0.0). Persistence of G_minus is then governed by the normal state machine (CFNAI-MA3 candidate + 2-month confirmation); a fall of Sahm back below the threshold re-arms the gate.",
+        "basis": "Sahm (2019) institutional standard for recession ONSET — not a state indicator: the rule stays elevated deep into recoveries. The v1.0.0 level rule therefore held G_minus long after troughs (Stagflation 1991-07..1992-12, Slowdown 2020-08..2021-04 with CFNAI-MA3 +4.6, Stagflation 2024-07..10 with no NBER recession). Edge trigger validated on 1968-2026: 8/8 NBER captures, entry latencies unchanged (COVID April 2020 (confirmed), GFC April 2008 (confirmed)), false-positive G_minus months 55 -> 4.",
+        "status": "FIXED"
+      },
+      "sos_early_warning": {
+        "input": "SOS indicator",
+        "source": "Richmond Fed (https://www.richmondfed.org/research/national_economy/sos_recession_indicator)",
+        "fred_code": null,
+        "pipeline_source": "richmond_fed_scraper",
+        "threshold": 0.20,
+        "direction": ">=",
+        "effect": "If CFNAI-MA3 is in G_neutral band AND SOS >= 0.20, upgrade candidate state to G_minus before hysteresis check.",
+        "basis": "O'Trakoun & Scavette, Economics Letters 2025. 7 recessions correctly signaled since 1971. Current (May 2026): SOS = 0.000 — no signal.",
+        "status": "FIXED"
+      },
+      "icsa_corroboration": {
+        "input": "ICSA 4-week MA YoY change",
+        "fred_code": "ICSA",
+        "threshold": 15,
+        "direction": ">",
+        "unit": "percent",
+        "effect": "Corroboration signal only — logged in regime_current.json as icsa_corroboration_triggered boolean. Does not override axis classification.",
+        "percentile_note": "15% YoY increase in initial claims is a conservative signal threshold. No percentile calibration required for a corroboration-only input.",
+        "status": "CALIBRATED"
+      }
+    },
+    "momentum_override": {
+      "status": "EXCLUDED_V1",
+      "reason": "Architecture decision (v1.0 design). Simple rule = reproducible = defensible. Reintroduce in v1.1 with explicit calibration window."
+    }
+  },
+
+  "inflation_axis": {
+    "primary_input": "Trimmed Mean PCE 12-month",
+    "fred_code": "PCETRIM12M159SFRBDAL",
+    "treatment": "12-month rate as published by Dallas Fed. No transformation.",
+    "distribution_note": "579 observations, 1978-01-01 to 2026-03-01. p5=1.54%, p10=1.63%, p25=1.88%, p50=2.41%, p60=2.67%, p66=2.95%, p75=3.63%, p90=5.02%.",
+    "states": {
+      "I_plus": {
+        "condition": "PCE_trimmed_12m > 2.75",
+        "value": 2.75,
+        "unit": "percent",
+        "percentile": "61.5th percentile — 38.5% of months classify as I_plus.",
+        "basis": "Fed 2% target + 75 bps buffer. Validated: 2022 (range 3.70-4.99%) confirms I_plus. 2021 December (3.36%) confirms I_plus. January 2025 (2.77%) borderline I_plus (confirmed). March 2026 (2.36%) I_neutral (confirmed).",
+        "status": "CALIBRATED"
+      },
+      "I_neutral": {
+        "condition": "PCE_trimmed_12m between 1.50 and 2.75 inclusive",
+        "unit": "percent",
+        "basis": "Fed comfort zone ± buffer. Captures 2013-2016 (range 1.49-1.72% — almost entirely I_neutral, not I_minus as incorrectly expected in earlier spec draft), 2023-2026 disinflation path (range 2.36-4.85%).",
+        "note_on_2013_2016": "The 2013-2016 period is classified as I_neutral (low end of band), not I_minus. Trimmed Mean PCE sustained between 1.49% and 1.72% — below target but not deflation risk. This contradicts the earlier backtest_framework.md expectation. Corrected here.",
+        "status": "CALIBRATED"
+      },
+      "I_minus": {
+        "condition": "PCE_trimmed_12m < 1.50",
+        "value": 1.50,
+        "unit": "percent",
+        "percentile": "4.1th percentile — rare. Only 24 months out of 579 in the I_minus zone. Captures genuine deflation-risk episodes only.",
+        "basis": "Sustained below target; deflation risk zone. Validated: September 2009 (1.48%) confirms I_minus. January 2015 (1.49%) borderline I_minus. The rarity (4th percentile) is intentional — I_minus should flag genuine disinflationary contraction, not ordinary below-target phases.",
+        "status": "CALIBRATED"
+      }
+    },
+    "momentum_override": {
+      "status": "EXCLUDED_V1",
+      "reason": "Architecture decision (v1.0 design). Excluded from both I_plus and I_minus in v1.0."
+    },
+    "secondary_confirmation": {
+      "t5yifr": {
+        "fred_code": "T5YIFR",
+        "start_date": "2003-01-01",
+        "availability_note": "NOT available pre-2003. Secondary confirmation only — never overrides primary PCE classification.",
+        "states": {
+          "elevated_expectations": {
+            "condition": "> 2.50",
+            "confirms": "I_plus",
+            "status": "CALIBRATED"
+          },
+          "anchored": {
+            "condition": "2.00 to 2.50",
+            "confirms": "I_neutral",
+            "status": "CALIBRATED"
+          },
+          "disanchored_low": {
+            "condition": "< 1.75",
+            "confirms": "I_minus",
+            "status": "CALIBRATED"
+          }
+        }
+      }
+    }
+  },
+
+  "stress_overlay": {
+    "primary_input": "NFCI",
+    "fred_code": "NFCI",
+    "treatment": "Monthly average of weekly Friday values. NOTE: this treatment yields significantly lower values than weekly peaks. The reference episodes below are based on monthly averages, not intra-month peaks.",
+    "distribution_note": "665 monthly observations (1971–2026). p5=-0.77, p10=-0.71, p30=-0.56, p50=-0.39, p70=-0.03, p80=+0.41, p90=+1.40, p93=+2.02. Constructed with mean=0, std=1 over 1971+ sample, but distribution is right-skewed (crisis tail extends to +5.18).",
+    "critical_note_on_episode_references": "Previous spec references to 'COVID March 2020: NFCI peak ~+2.0' and '2022: NFCI peak ~+0.9' are INCORRECT. Actual data: COVID March 2020 monthly average NFCI = +0.09 (max weekly = +0.27 on March 27, 2020). 2022 NFCI remained negative throughout (range -0.55 to -0.10 monthly). The NFCI correctly reflects that financial conditions remained loose in 2022 despite rate hikes (excess COVID-era liquidity). These corrections affect the validation table but not the threshold values.",
+    "hy_oas_note": "HY OAS (BAMLH0A0HYM2) is NOT a primary input in v1.0. FRED truncates ICE BofA series to 3 years from April 2026. Check at runtime: if data/bamlh0a0hym2_history.csv exists → log as corroboration only; if absent → proceed with NFCI alone.",
+    "hysteresis_applies": false,
+    "levels": {
+      "accommodating": {
+        "nfci_threshold": -0.50,
+        "nfci_direction": "<",
+        "label_EN": "under accommodating financial conditions",
+        "label_FR": "dans un contexte financier accommodant",
+        "percentile": "38.3% of months historically are accommodating — this reflects the structural loose-conditions bias of post-1990 monetary policy.",
+        "basis": "NFCI below historical average by 0.5 std dev. Validated: 2021 full year (range -0.54 to -0.69 monthly) (confirmed). Current May 2026: -0.51 confirms accommodating.",
+        "episode_validation": {
+          "2021_QE_maximum": "NFCI monthly average range -0.54 to -0.69. Confirmed accommodating.",
+          "2022_tightening": "NFCI monthly range -0.55 to -0.10. Transitions from accommodating to neutral mid-2022 — NEVER reaches restrictive. This is the correct reading: financial conditions remained loose despite rate hikes.",
+          "COVID_2020": "NFCI monthly average March 2020 = +0.09, April = +0.25. NOT accommodating in March-April 2020. The Sahm gate handles recession classification; overlay = neutral for COVID peak months.",
+          "GFC_2008": "NFCI transitions: restrictive in September 2008 (+1.39), then acute_stress from October 2008 (+2.47) through early 2009. (confirmed)"
+        },
+        "status": "CALIBRATED"
+      },
+      "neutral": {
+        "nfci_range": [-0.50, 0.50],
+        "label_EN": null,
+        "label_FR": null,
+        "basis": "Default state. No prefix added to regime name.",
+        "status": "CALIBRATED"
+      },
+      "restrictive": {
+        "nfci_range": [0.50, 1.50],
+        "label_EN": "under restrictive financial conditions",
+        "label_FR": "dans un contexte de conditions financières restrictives",
+        "percentile": "NFCI > 0.50 occurs in 18.5% of months (p81). NFCI > 1.50 in 9.3% of months (p91).",
+        "basis": "NFCI above historical average. Historically associated with credit tightening cycles. Note: 2022 did NOT reach restrictive on monthly average basis despite 525bps of rate hikes.",
+        "status": "CALIBRATED"
+      },
+      "acute_stress": {
+        "nfci_threshold": 1.50,
+        "nfci_direction": ">",
+        "label_EN": "under acute financial stress",
+        "label_FR": "sous stress financier aigu",
+        "percentile": "9.3% of months (p91). GFC peak: +2.47 to +2.98 monthly average (Oct-Dec 2008). (confirmed)",
+        "basis": "Rare crisis-level stress. GFC 2008-2009 only confirmed episode in calibration window. COVID 2020 does NOT reach acute_stress on monthly NFCI basis.",
+        "status": "CALIBRATED"
+      }
+    }
+  },
+
+  "hysteresis": {
+    "applies_to": ["growth_axis", "inflation_axis"],
+    "does_not_apply_to": ["stress_overlay"],
+    "confirmation_months": 2,
+    "rule": "A candidate state change is confirmed only after 2 consecutive monthly periods with primary inputs beyond the threshold. The overlay updates immediately each month.",
+    "hard_gates": {
+      "sahm_hard_gate": {
+        "input": "SAHMREALTIME",
+        "threshold": 0.50,
+        "effect": "Immediate G_minus on UPWARD CROSSING (v1.1.0 edge trigger). No confirmation period on entry. Does NOT hold the state while the level stays above the threshold: exit is governed by the state machine."
+      }
+    }
+  },
+
+  "global_context": {
+    "synchronization": {
+      "us_cli": {
+        "fred_code": "USALOLITOAASTSAM",
+        "treatment": "3-month delta (current month minus 3 months prior). Sign determines direction."
+      },
+      "g7_cli": {
+        "fred_code": "G7LOLITOAASTSAM",
+        "treatment": "3-month delta. Sign determines direction."
+      },
+      "rule": "If sign(US_CLI_3m_delta) == sign(G7_CLI_3m_delta): global_sync = 'synchronized'. Else: 'divergent'.",
+      "note": "Use amplitude-adjusted (AA) variants. Directional rule is binary — no numeric threshold needed. Noise risk: if too noisy, apply 2-month confirmation before switching sync label (implement as optional flag in code).",
+      "status": "CALIBRATED"
+    },
+    "dollar_channel": {
+      "fred_code": "DTWEXBGS",
+      "treatment": "3-month percent change",
+      "thresholds": {
+        "strengthening": {
+          "value": 3.0,
+          "direction": ">",
+          "label_EN": "dollar strengthening (tighter global financial conditions)",
+          "label_FR": "dollar en appréciation (conditions mondiales plus restrictives)"
+        },
+        "neutral": {
+          "range": [-3.0, 3.0],
+          "label_EN": null,
+          "label_FR": null
+        },
+        "weakening": {
+          "value": -3.0,
+          "direction": "<",
+          "label_EN": "dollar weakening (easing global financial conditions)",
+          "label_FR": "dollar en dépréciation (détente des conditions mondiales)"
+        }
+      },
+      "basis": "Market convention. ±3% over 3 months represents a directionally significant move without capturing noise. Validated: 2022 H2 dollar appreciation (confirmed) (DXY +15% in that period); 2020 H2 dollar weakness (confirmed).",
+      "status": "CALIBRATED"
+    },
+    "commodity_channel": {
+      "input": "Brent crude YoY percent change",
+      "source": "World Bank CMO (eco3min existing pipeline) — monthly, LBMA-consistent pricing",
+      "thresholds": {
+        "shock": {
+          "value": 20.0,
+          "direction": ">",
+          "label_EN": "commodity supply/demand shock",
+          "label_FR": "choc sur les matières premières"
+        },
+        "neutral": {
+          "range": [-20.0, 20.0],
+          "label_EN": null,
+          "label_FR": null
+        },
+        "demand_destruction": {
+          "value": -20.0,
+          "direction": "<",
+          "label_EN": "commodity demand destruction",
+          "label_FR": "effondrement de la demande en matières premières"
+        }
+      },
+      "episode_validation": {
+        "2022_shock": "Brent YoY peaked at +70%+ in H1 2022. (confirmed) shock",
+        "2020_demand_destruction": "Brent YoY reached -65% in April 2020. (confirmed) demand_destruction",
+        "2026_current": "Brent YoY: March 2026 = +41.8%, April 2026 = +72.2%. Confirmed as a shock. Iran/Hormuz geopolitical driver."
+      },
+      "status": "CALIBRATED"
+    },
+    "global_stress": {
+      "vix": {
+        "fred_code": "VIXCLS",
+        "thresholds": {
+          "normal": {"condition": "< 20", "label_EN": null, "label_FR": null},
+          "elevated": {"condition": "20 to 30", "label_EN": "elevated market volatility", "label_FR": "volatilité des marchés élevée"},
+          "acute": {"condition": "> 30", "label_EN": "acute global market stress", "label_FR": "stress aigu sur les marchés mondiaux"}
+        },
+        "basis": "Widely used market convention. CBOE thresholds broadly accepted.",
+        "status": "FIXED"
+      },
+      "em_spreads": {
+        "status": "EXCLUDED_V1",
+        "reason": "ICE Data truncation (BAMLEMHBHYCRPIOAS). Reintroduce in v1.1."
+      },
+      "ciss_eurozone": {
+        "ecb_sdw_code": "CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX",
+        "treatment": "Monthly average of daily values",
+        "threshold": 0.30,
+        "direction": ">",
+        "label_if_triggered_EN": "European systemic stress elevated",
+        "label_if_triggered_FR": "stress systémique européen élevé",
+        "basis": "ECB CISS ranges from 0 (no stress) to 1 (maximum stress). 0.30 ≈ 70th-75th percentile historically. Validated: Eurozone debt crisis 2011-2012 (CISS sustained above 0.40) (confirmed); post-2015 normal (CISS typically 0.05-0.15) (confirmed).",
+        "status": "CALIBRATED"
+      }
+    }
+  },
+
+  "headline_underlying_divergence": {
+    "rule": "true when inflation_state in ['I_neutral', 'I_minus'] AND brent_yoy_pct > 40.0",
+    "threshold_value": 40.0,
+    "constant": "HUD_BRENT_SHOCK — dedicated constant, decoupled from BRENT_SHOCK (commodity_channel qualifier, unchanged at +/-20)",
+    "effect": "Boolean flag in regime_current.json. Surfaces the headline/underlying inflation gap in shortcode divergence block. Does NOT modify the regime name or code.",
+    "calibration_v1_1_0": "At +20% the flag was active 26.0% of post-1988 months (incl. an 18-month stretch in 2004-2005) — an ordinary oil-bull-market indicator, not a shock signal. At +40%: 17.9% of months, every genuine shock episode preserved (1990 Gulf, 1999-2000, 2021 H1, March-May 2026). +50% tested: 11.6% but loses March 2026 (+41.8% YoY), the very month the current divergence episode began.",
+    "current_status_july_2026": "off since the June 2026 print (Brent YoY back near +20% and below the +40 trigger); was on March-May 2026 (+41.8 / +72.2 / +66.2%)"
+  },
+
+  "wu_xia_shadow_rate": {
+    "status": "DEPRECATED_FOR_LIVE_USE",
+    "reason": "Atlanta Fed suspended updates April 2022 (last value: 0.21%, Feb 2022).",
+    "backtest_use": "Historical fixture for ZLB periods only: Dec 2008 - Dec 2015, Mar 2020 - Mar 2022. Store as data/wu_xia_history.csv. Splice with FEDFUNDS outside ZLB.",
+    "source": "https://www.atlantafed.org/cqer/research/wu-xia-shadow-federal-funds-rate"
+  },
+
+  "backtest_limitations": {
+    "vintages": "The backtest uses currently published (revised) FRED data, not real-time vintages — except SAHMREALTIME, real-time by construction. CFNAI and Trimmed Mean PCE are revised: the 2021 I_plus switch reads October 2021 on the July 2026 vintage vs December 2021 on the May 2026 vintage; the revised Trimmed Mean PCE never exceeds 2.75% in 2008 (no Stagflation interlude in the GFC, contrary to the original expectation). The NFCI is re-estimated weekly over its FULL history: the May 2026 monthly average moved from -0.515 (May 2026 production run) to -0.4998 (July 2026 re-estimation), flipping the overlay label at the -0.50 boundary — documented boundary-noise property of a no-hysteresis overlay, not a calibration defect. Acceptable for a monthly editorial card; not a real-time signal.",
+    "hy_oas": "BAMLH0A0HYM2 not backtestable before 2023-05 (FRED 3-year truncation since April 2026; pre-2023 archive lost). NFCI sole overlay primary; HY OAS corroboration only.",
+    "sos_gate": "Richmond Fed SOS historical series not retrievable at calibration time (CSV endpoints unavailable). The SOS gate (threshold 0.20, FIXED institutional) is NOT covered by this backtest and operates live-only.",
+    "brent_source": "Backtest Brent = FRED MCOILBRENTEU fallback; production uses World Bank CMO. Small level differences possible near the +40% divergence trigger.",
+    "pre_2003": "Rows before 2003-01 are data_quality=degraded (no T5YIFR, SOS; no Trimmed Mean PCE pre-1978, no NFCI pre-1971). Pre-1978 recessions are scored on the growth axis only."
+  },
+
+  "output_format": {
+    "regime_current_json": {
+      "fields": {
+        "regime_name_EN": "string",
+        "regime_name_FR": "string",
+        "regime_code": "integer (1-8)",
+        "growth_state": "string (G_plus | G_neutral | G_minus)",
+        "inflation_state": "string (I_plus | I_neutral | I_minus)",
+        "stress_overlay": "string (accommodating | neutral | restrictive | acute_stress)",
+        "full_label_EN": "string (name + overlay prefix if applicable)",
+        "full_label_FR": "string",
+        "global_sync": "string (synchronized | divergent)",
+        "global_qualifiers": "array of string",
+        "headline_underlying_divergence": "boolean",
+        "color_zone_hex": "string",
+        "color_line_hex": "string",
+        "color_label_hex": "string",
+        "data_as_of": "ISO date (most recent input data date)",
+        "computed_at": "ISO datetime UTC",
+        "thresholds_version": "string (semver, must match this file version)",
+        "data_freshness": "string (current | lagged)",
+        "lagged_inputs": "array of string (series codes of lagged inputs)",
+        "icsa_corroboration_triggered": "boolean",
+        "input_values": {
+          "cfnai_ma3": "float",
+          "sahmrealtime": "float",
+          "sos": "float",
+          "pce_trimmed_12m": "float",
+          "t5yifr": "float",
+          "nfci": "float",
+          "hy_oas_bps": "float or null",
+          "t10y2y": "float",
+          "fedfunds": "float",
+          "usaloli_3m_delta": "float",
+          "g7loli_3m_delta": "float",
+          "dtwexbgs_3m_pct": "float",
+          "brent_yoy_pct": "float",
+          "vixcls": "float",
+          "icsa_4w_ma_yoy_pct": "float"
+        },
+        "methodology_url_EN": "string",
+        "methodology_url_FR": "string"
+      }
+    },
+    "regime_history_csv": {
+      "columns": [
+        "date",
+        "regime_code",
+        "regime_name_EN",
+        "regime_name_FR",
+        "growth_state",
+        "inflation_state",
+        "stress_overlay",
+        "global_sync",
+        "cfnai_ma3",
+        "sahmrealtime",
+        "sos",
+        "pce_trimmed_12m",
+        "t5yifr",
+        "nfci",
+        "t10y2y",
+        "fedfunds",
+        "usaloli_3m_delta",
+        "g7loli_3m_delta",
+        "dtwexbgs_3m_pct",
+        "brent_yoy_pct",
+        "vixcls",
+        "headline_underlying_divergence",
+        "thresholds_version",
+        "data_quality"
+      ],
+      "date_format": "YYYY-MM-01",
+      "data_quality_values": ["full", "degraded"],
+      "notes": "24 columns in the published output schema. data_quality=degraded for pre-2003 rows (missing T5YIFR, Net Liquidity, SOS, OECD CLI). NaN for missing inputs — no imputation."
+    }
+  }
+}

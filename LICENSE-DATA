@@ -1,0 +1,30 @@
+# Data and documentation licence
+
+The following are licensed under the Creative Commons Attribution 4.0
+International licence (CC-BY 4.0) — https://creativecommons.org/licenses/by/4.0/
+
+  - config/thresholds.json      (the threshold table)
+  - docs/methodology.md
+  - docs/backtest.md
+  - output/regime_history.csv   (generated)
+  - output/regime_current.json  (generated)
+
+Attribution:
+
+  Eco3min Macro Regime Classification, threshold table v1.1.0.
+  https://eco3min.fr/en/macro-regime-classification-methodology/
+
+## What this licence does NOT cover
+
+The source time series consumed by this code are the property of their
+publishers and are governed by those publishers' own terms. They are NOT
+redistributed in this repository. In particular:
+
+  - ICE BofA indices (e.g. BAMLH0A0HYM2) — ICE Data Indices, LLC
+  - VIX (VIXCLS) — Cboe Global Markets
+  - OECD composite leading indicators (USALOLITOAASTSAM, G7LOLITOAASTSAM) — OECD
+  - CISS — European Central Bank
+  - Series distributed via FRED — see the copyright notice attached to each
+    series on fred.stlouisfed.org
+
+The code is licensed separately under the MIT licence — see LICENSE.
