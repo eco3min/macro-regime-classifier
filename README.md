@@ -36,12 +36,18 @@ export FRED_API_KEY=your_key   # free: https://fred.stlouisfed.org/docs/api/api_
 python scripts/regime_classifier.py
 ```
 
-Writes to `output/`:
+Writes to `output/datasets/`:
 
 | File | Contents |
 |---|---|
-| `regime_history.csv` | one row per month, 2003-01 → current, with input values and `thresholds_version` |
+| `regime_history.csv` / `.xlsx` | one row per month, 2003-01 → current, with input values and `thresholds_version` |
 | `regime_current.json` | latest month, plus `data_freshness`, `lagged_inputs`, `computed_at` |
+| `regime_lookup.json` | month → verdict index, back to 1978, used by the "regime on a given date" tool |
+
+The run also re-exports its three primary inputs as standalone series
+(`cfnai-national-activity-index`, `trimmed-mean-pce-inflation`,
+`euro-area-ciss-systemic-stress`), in `.csv` / `.xlsx` / `.json`. They are a by-product of the
+production pipeline, not a classification output.
 
 A run takes a few minutes — the script paces its FRED calls deliberately.
 
@@ -114,7 +120,7 @@ publishers.
 Two consequences for anyone reproducing this:
 
 1. **Brent.** Production reads the World Bank CMO monthly series. Without a local
-   `data/world_bank_brent.csv`, this script falls back to FRED `MCOILBRENTEU`. Brent feeds the
+   `output/datasets/world_bank_brent.csv`, this script falls back to FRED `MCOILBRENTEU`. Brent feeds the
    commodity qualifier and the `headline_underlying_divergence` flag — never the growth or
    inflation axis, so the regime name is unaffected.
 2. **HY OAS.** Not a classification input in v1.1.0 (corroboration only) and absent from the
