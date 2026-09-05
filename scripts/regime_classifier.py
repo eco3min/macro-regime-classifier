@@ -914,7 +914,7 @@ def zone_brent(v):  # variation YoY en % — seuils ancres BRENT_SHOCK / BRENT_D
 def read_dataset_latest(dataset_id, metric_key=None):
     """(value, as_of, prev_value) ou (None, None, None) si indispo.
     metric_key : colonne metrique explicite. Si None, prend la DERNIERE cle
-    non-date (contrat pipeline 2.3). /!\ score-eco3min met `score` en PREMIERE
+    non-date (contrat pipeline 2.3). /!\\ score-eco3min met `score` en PREMIERE
     colonne -> passer metric_key="score". Degradation gracieuse, jamais de crash."""
     try:
         url = "%s/%s.json" % (DATASET_BASE_URL, dataset_id)
