@@ -183,7 +183,7 @@ label, and inputs that are **fetched for corroboration only**.
 |---|---|---|---|---|
 | Chicago Fed NAI | `CFNAI` | Chicago Fed / FRED | 3-month MA | **Determines** the growth axis |
 | Sahm real-time | `SAHMREALTIME` | FRED | Level | **Determines** — upward crossing of 0.50 forces G− |
-| SOS indicator | *(Richmond Fed, scraped)* | Richmond Fed | Level | **Determines** in principle — inert in practice, see below |
+| SOS-style indicator | `IURSA` | Department of Labor / FRED, computed by the classifier | 26-week MA minus its minimum over the 52 preceding weeks | **Determines** from May 2026 only, see below |
 | Trimmed Mean PCE | `PCETRIM12M159SFRBDAL` | Dallas Fed / FRED | 12-month rate, as published | **Determines** the inflation axis |
 | NFCI | `NFCI` | Chicago Fed / FRED | Monthly average of weekly values | **Determines** the financial-conditions qualifier |
 | 5Y5Y forward breakeven | `T5YIFR` | FRED | Monthly | Published for context |
@@ -193,10 +193,16 @@ label, and inputs that are **fetched for corroboration only**.
 | HY OAS | `BAMLH0A0HYM2` | ICE / FRED | Monthly | Corroboration only — restricted licence, excluded from all output |
 
 **On the SOS gate.** Within the CFNAI-MA3 neutral band, an SOS reading at or above 0.20 promotes the
-candidate state to G−. The series is not reliably retrievable programmatically, and the column is
-empty on all 283 rows of the published snapshot: the gate has never fired and no verdict in this
-series depends on it. It is retained in the code and in the schema because it is part of the
-specified method; removing it would hide the gap rather than document it.
+candidate state to G−. Since 25 September 2026 the classifier computes the indicator itself from the
+weekly insured unemployment rate (`IURSA`), with the method of O'Trakoun and Scavette (*Economics
+Letters*, 2025). It replaces the Federal Reserve Bank of Richmond series, which was not retrievable
+programmatically and whose terms bar republication without written permission. The computation
+matches the Richmond Fed's latest published reading and crosses 0.20 once per NBER recession since
+1972, with no false signal. The gate was never part of the calibration, so it applies only to
+months classified from May 2026 (`SOS_GATE_START`). Applied to the full history it would reclassify
+35 recovery months (1983, 1991–1992, 2002, 2009–2010) as G−, because the indicator stays above 0.20
+for about a year after each trough. No verdict before May 2026 depends on it. The `sos` column is
+filled in the live output and stays empty in the frozen v1.1.0 snapshot.
 
 **On HY OAS.** Since April 2026 FRED returns only a three-year rolling window for ICE BofA series.
 The code reads an optional local fixture for the earlier history. HY OAS is not a classification
@@ -250,7 +256,7 @@ gap between the design and the implementation is explicit rather than discoverab
 | Input | Threshold | Direction | Basis |
 |---|---|---|---|
 | Sahm real-time (`SAHMREALTIME`) | 0.50 | ≥ 0.50 → recession gate fires | Sahm (2019), institutional standard |
-| SOS indicator | 0.20 | ≥ 0.20 → early recession corroboration | O'Trakoun & Scavette, Economics Letters 2025 |
+| SOS-style indicator (computed from `IURSA`) | 0.20 | ≥ 0.20 → early recession corroboration, from May 2026 | O'Trakoun & Scavette, Economics Letters 2025 |
 | NFCI | 0.00 | > 0 → tighter than historical average | Chicago Fed definition |
 | T10Y2Y | 0.00 | < 0 → inverted curve | Market convention, institutional |
 | Trimmed Mean PCE | 2.00% | Fed's symmetric target | Federal Reserve official target |
@@ -331,7 +337,7 @@ Global stress: VIX > 25 = elevated; VIX > 35 = acute. Combine with EM spreads if
 
 ### 6.1 Intra-axis aggregation
 
-**Growth axis**: primary = CFNAI-MA3. Secondary override gates: Sahm ≥ 0.50 or SOS ≥ 0.20 → G− override. ICSA 4-week MA (YoY change > +15%) → corroboration signal, not primary.
+**Growth axis**: primary = CFNAI-MA3. Secondary override gates: Sahm ≥ 0.50 or SOS ≥ 0.20 (from May 2026) → G− override. ICSA 4-week MA (YoY change > +15%) → corroboration signal, not primary.
 
 Rule: CFNAI-MA3 determines the state. Secondary gates can upgrade to G− only (they cannot upgrade to G+).
 

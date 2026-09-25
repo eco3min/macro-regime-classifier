@@ -40,7 +40,7 @@ Writes to `output/datasets/`:
 
 | File | Contents |
 |---|---|
-| `regime_history.csv` / `.xlsx` | one row per month, 2003-01 → current, with input values and `thresholds_version` |
+| `regime_history.csv` / `.xlsx` | one row per month, 1978-01 → current (rows before 2003 flagged `data_quality: "degraded"`), with input values and `thresholds_version` |
 | `regime_current.json` | latest month, plus `data_freshness`, `lagged_inputs`, `computed_at` |
 | `regime_lookup.json` | month → verdict index, back to 1978, used by the "regime on a given date" tool |
 
@@ -52,7 +52,9 @@ production pipeline, not a classification output.
 A run takes a few minutes — the script paces its FRED calls deliberately.
 
 A frozen snapshot of the full monthly history is committed at
-[`docs/regime_history_v1.1.0.csv`](docs/regime_history_v1.1.0.csv). Re-running the code will not
+[`docs/regime_history_v1.1.0.csv`](docs/regime_history_v1.1.0.csv). It keeps every verdict and the
+inputs that can be republished; the five columns that reproduce FRED series marked "Copyrighted:
+Citation required" are omitted. Re-running the code will not
 always reproduce it exactly: the sources are revised, and the NFCI in particular is re-estimated
 weekly over its entire history. See [`docs/SNAPSHOT.md`](docs/SNAPSHOT.md).
 
@@ -106,9 +108,21 @@ verdict depends on threshold immutability for a given version.
 
 | Source | Series | Access |
 |---|---|---|
-| FRED (St. Louis Fed) | `CFNAI`, `SAHMREALTIME`, `PCETRIM12M159SFRBDAL`, `T5YIFR`, `NFCI`, `T10Y2Y`, `FEDFUNDS`, `ICSA`, `DTWEXBGS`, `DFII10` | API key required |
+| FRED (St. Louis Fed) | `CFNAI`, `SAHMREALTIME`, `PCETRIM12M159SFRBDAL`, `T5YIFR`, `NFCI`, `T10Y2Y`, `FEDFUNDS`, `ICSA`, `DTWEXBGS`, `DFII10`, `IURSA` | API key required |
 | ECB Data Portal | CISS, euro area | open, no key |
-| Richmond Fed | SOS recession indicator | scraped, degrades gracefully if unavailable |
+
+The SOS early-warning input is computed by the classifier itself from the weekly insured
+unemployment rate (`IURSA`, U.S. Department of Labor, public domain), with the method of O'Trakoun
+and Scavette (*Economics Letters*, 2025): the 26-week moving average minus its minimum over the 52
+preceding weeks. It is not the Federal Reserve Bank of Richmond series, whose terms of use bar
+republication without written permission.
+
+The outputs you generate by running the code do contain values of some source series, and those
+values stay under their publishers' terms, not under CC-BY: `cfnai_ma3` and `nfci` (Federal Reserve
+Bank of Chicago), `pce_trimmed_12m` (Federal Reserve Bank of Dallas), `t5yifr` and `t10y2y`
+(Federal Reserve Bank of St. Louis) carry the FRED status "Copyrighted: Citation required", and
+`ciss` in `regime_current.json` comes from the European Central Bank. The frozen snapshot in
+`docs/` omits these columns. See [`LICENSE-DATA`](LICENSE-DATA).
 
 Three inputs carry restrictive third-party licences — ICE BofA HY OAS (`BAMLH0A0HYM2`), Cboe VIX
 (`VIXCLS`), OECD composite leading indicators (`USALOLITOAASTSAM`, `G7LOLITOAASTSAM`). They are
@@ -148,8 +162,8 @@ Fuller treatment: [`docs/methodology.md` §8](docs/methodology.md) and
 ## Licence
 
 - **Code** — MIT. See [`LICENSE`](LICENSE).
-- **Threshold table, methodology, and derived outputs** (`regime_history.csv`, `regime_current.json`) — CC-BY 4.0. See [`LICENSE-DATA`](LICENSE-DATA).
-- **Source series** — governed by their respective publishers' terms. Not redistributed here.
+- **Threshold table, methodology, and the fields Eco3min produces** in `regime_history.csv` and `regime_current.json` (regime labels, states, qualifiers, flags, computed columns) — CC-BY 4.0. See [`LICENSE-DATA`](LICENSE-DATA).
+- **Source series** — governed by their respective publishers' terms. Not redistributed here; the outputs you generate contain some of their values, under those terms. See [`LICENSE-DATA`](LICENSE-DATA).
 
 ## Citation
 

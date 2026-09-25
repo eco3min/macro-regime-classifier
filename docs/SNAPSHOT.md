@@ -13,33 +13,42 @@ are never edited after publication; a correction produces a new version, not an 
 |---|---|---|---|---|
 | `regime_history_v1.1.0.csv` | 1.1.0 | 283 | 2003-01 → 2026-07 | July 2026 |
 
+**Revision of 25 September 2026.** Five input columns were removed from `regime_history_v1.1.0.csv`
+(point 5 below), so that this repository redistributes no source series. No verdict row changed:
+every remaining value is identical to the file first published. The file name is kept because
+published pages link to it.
+
 Licence: CC-BY 4.0 (see `../LICENSE-DATA`).
 
 ---
 
 ## Reading the file
 
-24 columns. `date` first, then the verdict (`regime_code`, `regime_name_EN`, `regime_name_FR`,
-`growth_state`, `inflation_state`, `stress_overlay`, `global_sync`), then the input values that
-produced it, then provenance (`thresholds_version`, `data_quality`).
+19 columns. `date` first, then the verdict (`regime_code`, `regime_name_EN`, `regime_name_FR`,
+`growth_state`, `inflation_state`, `stress_overlay`, `global_sync`), then the inputs that can be
+republished (`sahmrealtime`, `sos`, `fedfunds`, `dtwexbgs_3m_pct`, `brent_yoy_pct`,
+`icsa_4w_ma_yoy_pct`), then flags and provenance (`headline_underlying_divergence`,
+`thresholds_version`, `data_quality`, `global_qualifiers`, `icsa_corroboration_triggered`). The
+code itself writes 24 columns; see point 5.
 
 All 283 rows carry `thresholds_version = 1.1.0` and `data_quality = full` — the snapshot starts at
 2003-01, inside the full-resolution window, so no degraded rows appear here.
 
-## Four things to know before you compute anything from this file
+## Five things to know before you compute anything from this file
 
 **1. Three inputs are computed but not published.** ICE BofA HY OAS, the Cboe VIX and the OECD
 composite leading indicators carry restrictive licences and are excluded by design. Only the
 categorical labels derived from them survive, in `global_sync` and `global_qualifiers`. You cannot
 recompute `global_sync` from this file alone; fetch the OECD series from its publisher.
 
-**2. `sos` is empty on every row.** The Richmond Fed SOS indicator is an early-warning gate on the
-growth axis: within the CFNAI-MA3 neutral band, an SOS reading at or above 0.20 promotes the
-candidate state to G−. The series is not retrievable programmatically in a usable historical form,
-so the gate is inert throughout this snapshot and never affected a single verdict here. It is kept
-in the schema and in the code because it is part of the specified method, and removing the column
-would hide the gap rather than document it. Every G− in this file comes from the CFNAI-MA3
-threshold or the Sahm crossing, never from the SOS.
+**2. `sos` is empty on every row.** The SOS indicator is an early-warning gate on the growth axis:
+within the CFNAI-MA3 neutral band, a reading at or above 0.20 promotes the candidate state to G−.
+When this snapshot was frozen, the input was the Federal Reserve Bank of Richmond series, which was
+not retrievable programmatically in a usable historical form, so the gate is inert throughout this
+snapshot and never affected a single verdict here. Every G− in this file comes from the CFNAI-MA3
+threshold or the Sahm crossing, never from the SOS. Since 25 September 2026 the classifier computes
+an SOS-style indicator from the insured unemployment rate (`IURSA`), so the column is filled in the
+live output. The gate applies only from May 2026, which leaves every row of this snapshot unchanged.
 
 **3. `dtwexbgs_3m_pct` is empty for the first 39 rows** (2003-01 → 2006-03). The broad dollar index
 `DTWEXBGS` starts in 2006. The dollar qualifier is simply absent before then; the regime name is
@@ -50,6 +59,15 @@ metrics over 1968–2026 (703 months, degraded before 2003). This snapshot cover
 Computed on this file, Transition is 52.3% of months and the regime changes 1.23 times per year;
 the backtest reports 28.9% and 1.26/year over the longer window. Both are correct for their
 respective windows — do not read the gap as an inconsistency.
+
+**5. Five inputs are not in this file.** `cfnai_ma3`, `nfci`, `pce_trimmed_12m`, `t5yifr` and
+`t10y2y` reproduce FRED series marked "Copyrighted: Citation required" (Federal Reserve Banks of
+Chicago, Dallas and St. Louis). FRED allows their display with attribution but not their
+sub-licensing, which a CC-BY file would imply, so they were removed on 25 September 2026. The
+classification rows are unaffected. To check a verdict against the values it was computed from,
+retrieve the July 2026 vintage from ALFRED (https://alfred.stlouisfed.org), FRED's archive of past
+vintages, where it exists for the series, or run the code, which writes these columns to your
+local output under the publishers' terms.
 
 ## Known documentation gap in the v1.1.0 changelog
 

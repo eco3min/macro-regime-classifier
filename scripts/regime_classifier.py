@@ -37,6 +37,36 @@ import requests
 
 # Shared infra — FredFetcher, touch_wordpress
 from eco3min_common import FredFetcher, touch_wordpress
+from eco3min_series import pct_change_by_date
+from source_rights import (
+    rights_by_key, rights_for_series, source_sheet_rows, columns_source_sheet_rows,
+    meta_attribution,
+)
+
+# Colonnes de regime_history.csv issues d'une serie FRED « citation required » :
+# l'onglet « Source » du XLSX les attribue une par une (le CSV garde ses colonnes,
+# lues par nom par le snippet 126).
+HISTORY_COLUMN_SERIES = {
+    "cfnai_ma3":       "CFNAI",
+    "pce_trimmed_12m": "PCETRIM12M159SFRBDAL",
+    "t5yifr":          "T5YIFR",
+    "nfci":            "NFCI",
+    "t10y2y":          "T10Y2Y",
+}
+HISTORY_OTHER_SOURCES = (
+    "Eco3min classification fields (regime, states, overlay, qualifiers). "
+    "sahmrealtime, fedfunds, dtwexbgs_3m_pct, icsa_4w_ma_yoy_pct and brent_yoy_pct "
+    "derive from public-domain FRED series (SAHMREALTIME, FEDFUNDS, DTWEXBGS, ICSA, "
+    "MCOILBRENTEU). sos: SOS-style indicator computed by Eco3min from the insured "
+    "unemployment rate (FRED IURSA, U.S. Department of Labor, public domain) with the "
+    "method of O'Trakoun and Scavette (Economics Letters, 2025); not the Federal "
+    "Reserve Bank of Richmond series."
+)
+HISTORY_TRANSFORM = (
+    "Series sampled to a monthly frequency by Eco3min; cfnai_ma3 is the three-month "
+    "moving average of CFNAI; dtwexbgs_3m_pct, brent_yoy_pct and icsa_4w_ma_yoy_pct "
+    "are percentage changes computed by Eco3min."
+)
 
 # ---------------------------------------------------------------------------
 # LOGGING
@@ -87,10 +117,13 @@ WP_TOUCH_URL = "https://eco3min.fr/wp-json/eco3min/v1/touch-datasets"
 # ECB SDW API
 ECB_API_BASE = "https://data-api.ecb.europa.eu/service/data"
 
-# Richmond Fed SOS
-RICHMOND_FED_SOS_URL = (
-    "https://www.richmondfed.org/research/national_economy/sos_recession_indicator"
-)
+# SOS-style — calcule par Eco3min depuis FRED IURSA (voir compute_sos_style)
+SOS_SERIES    = "IURSA"
+SOS_MA_WEEKS  = 26
+SOS_MIN_WEEKS = 52
+# Premier mois classe en production apres le gel v1.0.0 du 2026-05-26 : le seuil
+# SOS n'agit qu'a partir de la (« operates live-only », thresholds.json).
+SOS_GATE_START = pd.Timestamp("2026-05-01")
 
 # World Bank Brent — output du pipeline existant
 WORLD_BANK_BRENT_CSV = OUTPUT_DIR / "world_bank_brent.csv"
@@ -163,47 +196,33 @@ HUD_BRENT_SHOCK    = 40.0    # YoY pct
 # FETCHERS
 # ---------------------------------------------------------------------------
 
-def fetch_richmond_sos() -> pd.Series:
+def compute_sos_style(fetcher: FredFetcher) -> pd.Series:
     """
-    Fetch SOS recession indicator from Richmond Fed.
-    Tries CSV download first, falls back to HTML parse.
-    Returns pd.Series indexed by week-end date. Empty Series if unavailable.
-    """
-    csv_candidates = [
-        "https://www.richmondfed.org/-/media/richmondfedorg/research/national_economy/sos/sos_data.csv",
-        "https://www.richmondfed.org/-/media/richmondfedorg/research/national_economy/sos/sos.csv",
-    ]
-    for url in csv_candidates:
-        try:
-            df = pd.read_csv(url, parse_dates=[0])
-            df.columns = ["date", "sos"]
-            df.index = pd.to_datetime(df["date"])
-            s = df["sos"].dropna()
-            log.info(f"SOS fetched from CSV: {len(s)} obs, latest={s.iloc[-1]:.3f}")
-            return s
-        except Exception:
-            pass
+    Indicateur « SOS-style » calcule par Eco3min depuis le taux de chomage assure
+    hebdomadaire CVS du DOL (FRED IURSA, domaine public, lu le 2026-09-25) :
+    moyenne mobile 26 semaines moins son minimum sur les 52 semaines PRECEDENTES
+    (semaine courante exclue). Methode : O'Trakoun & Scavette, « A Better Sahm
+    Rule? Introducing the SOS Recession Indicator », Economics Letters 247, 2025.
 
+    Remplace la lecture de la serie de la Fed de Richmond : ses Terms & Conditions
+    (lus le 2026-09-25) interdisent la republication commerciale sans accord ecrit,
+    et ses deux URL CSV etaient en 404 (colonne sos vide dans regime_history).
+    Controle du 2026-09-25 : -0.0038 la semaine du 12/09/2026 (Richmond publie
+    -0.004) ; 7 franchissements du seuil 0.20 depuis 1972, un par recession NBER,
+    aucun faux signal. Donnee revisee (facteurs saisonniers), pas un vintage temps reel.
+    Returns pd.Series indexee par fin de semaine (samedi). Vide si IURSA manque.
+    """
     try:
-        from bs4 import BeautifulSoup
-        import re
-        resp = requests.get(
-            RICHMOND_FED_SOS_URL, timeout=30,
-            headers={"User-Agent": "eco3min-data-pipeline/1.0"}
-        )
-        resp.raise_for_status()
-        text = BeautifulSoup(resp.text, "html.parser").get_text(separator=" ")
-        matches = re.findall(r"(?:current\s+reading|sos)[:\s]+([0-9]\.[0-9]+)", text, re.I)
-        if matches:
-            val = float(matches[0])
-            s = pd.Series({pd.Timestamp.now().normalize(): val}, name="SOS")
-            log.info(f"SOS from HTML: {val:.3f}")
-            return s
+        iur = fetcher.get_series(SOS_SERIES).dropna().sort_index()
     except Exception as e:
-        log.warning(f"SOS HTML parse failed: {e}")
-
-    log.warning("SOS unavailable — proceeding without SOS signal")
-    return pd.Series(dtype=float, name="SOS")
+        log.warning(f"SOS-style : {SOS_SERIES} indisponible ({e}) — pas de signal SOS")
+        return pd.Series(dtype=float, name="SOS")
+    ma = iur.rolling(SOS_MA_WEEKS, min_periods=SOS_MA_WEEKS).mean()
+    prior_min = ma.shift(1).rolling(SOS_MIN_WEEKS, min_periods=SOS_MIN_WEEKS).min()
+    sos = (ma - prior_min).dropna().rename("SOS")
+    if not sos.empty:
+        log.info(f"SOS-style ({SOS_SERIES}) : {len(sos)} obs, latest={sos.iloc[-1]:.4f} au {sos.index[-1].date()}")
+    return sos
 
 
 def fetch_ecb_ciss() -> pd.Series:
@@ -292,7 +311,7 @@ def compute_cli_delta_3m(cli: pd.Series) -> pd.Series:
 
 
 def compute_brent_yoy(brent: pd.Series) -> pd.Series:
-    return brent.pct_change(periods=12).mul(100).rename("brent_yoy_pct")
+    return pct_change_by_date(brent, 12, "monthly").rename("brent_yoy_pct")
 
 
 def compute_dtwexbgs_3m_pct(s: pd.Series) -> pd.Series:
@@ -302,7 +321,7 @@ def compute_dtwexbgs_3m_pct(s: pd.Series) -> pd.Series:
 def compute_icsa_4w_ma_yoy(icsa_weekly: pd.Series) -> pd.Series:
     """4-week MA of weekly initial claims, then 52-week YoY change, resampled monthly."""
     ma4 = icsa_weekly.rolling(4).mean()
-    yoy = ma4.pct_change(periods=52).mul(100)
+    yoy = pct_change_by_date(ma4, 52, "weekly")
     return yoy.resample("MS").last().rename("icsa_4w_ma_yoy_pct")
 
 # ---------------------------------------------------------------------------
@@ -595,8 +614,8 @@ class DataBundle:
         self.dfii10       = fetcher.get_resampled("DFII10", "monthly")  # [terminal] taux réel 10 ans
         time.sleep(1.5)
 
-        log.info("Fetching SOS (Richmond Fed)...")
-        self.sos_weekly = fetch_richmond_sos()
+        log.info("Computing SOS-style indicator (IURSA)...")
+        self.sos_weekly = compute_sos_style(fetcher)
 
         log.info("Fetching ECB CISS...")
         ciss_daily = fetch_ecb_ciss()
@@ -698,8 +717,13 @@ def run_history(bundle: DataBundle, start_date: str = "2003-01-01") -> pd.DataFr
             )
             continue
 
+        # Seuil SOS « live-only » (thresholds.json, sos_gate) : hors backtest, il ne
+        # joue qu'a partir du gel de la calibration. La colonne sos est publiee sur
+        # tout l'historique, mais l'appliquer avant SOS_GATE_START reclasserait 35
+        # mois de reprise (1983, 1991-92, 2002, 2009-10) en G_minus.
+        sos_gate = inputs["sos"] if month >= SOS_GATE_START else float("nan")
         candidate_g = raw_classify_growth(
-            inputs["cfnai_ma3"], inputs["sahmrealtime"], inputs["sos"]
+            inputs["cfnai_ma3"], inputs["sahmrealtime"], sos_gate
         )
         candidate_i = raw_classify_inflation(inputs["pce_trimmed_12m"])
         sahm = inputs["sahmrealtime"]
@@ -1007,11 +1031,19 @@ def _save_regime_series(
     dataset_id: str,
     unit: str,
     output_dir: Path,
+    series_ids=None,
+    rights_key=None,
+    transform=None,
 ) -> None:
     """
     Sauvegarde un DataFrame série en CSV + XLSX + JSON + méta,
     dans le même format que eco3min_updater.py / save_dataset().
     Colonnes attendues : date en première position, métrique en dernière.
+    series_ids : series FRED amont. Une serie de SERIES_RIGHTS (CFNAI, PCETRIM…,
+    « citation required ») ajoute l'onglet « Source » au XLSX et le bloc
+    `source_rights` au meta, comme save_dataset() du pipeline FRED.
+    rights_key : cle SOURCE_RIGHTS directe pour une source hors FRED (CISS -> ecb).
+    transform : transformation declaree (condition d'integrite BCE / FMI).
     """
     if df is None or df.empty:
         log.warning(f"[regime_series] {dataset_id} — dataframe vide, skip")
@@ -1029,9 +1061,19 @@ def _save_regime_series(
     df.to_csv(csv_path, index=False)
     log.info(f"  [regime_series] CSV  → {csv_path}")
 
-    # XLSX
+    # XLSX — onglet « Source » APRES les donnees quand la serie est sous
+    # conditions : la premiere feuille reste « Sheet1 » (pd.read_excel inchange).
+    rights = rights_by_key(rights_key) or rights_for_series(series_ids)
     xlsx_path = output_dir / f"{dataset_id}.xlsx"
-    df.to_excel(xlsx_path, index=False, engine="openpyxl")
+    if rights is None:
+        df.to_excel(xlsx_path, index=False, engine="openpyxl")
+    else:
+        with pd.ExcelWriter(xlsx_path, engine="openpyxl") as xw:
+            df.to_excel(xw, index=False, sheet_name="Sheet1")
+            pd.DataFrame(
+                source_sheet_rows(rights, dataset_id, transform=transform),
+                columns=["Field", "Value"],
+            ).to_excel(xw, index=False, sheet_name="Source")
     log.info(f"  [regime_series] XLSX → {xlsx_path}")
 
     # JSON (records)
@@ -1072,6 +1114,8 @@ def _save_regime_series(
             "unit":                unit,
         },
     }
+    if rights:
+        meta["source_rights"] = meta_attribution(rights, transform=transform)
     meta_path = meta_dir / f"{dataset_id}.json"
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
@@ -1099,7 +1143,18 @@ def main():
     csv_path  = OUTPUT_DIR / "regime_history.csv"
     xlsx_path = OUTPUT_DIR / "regime_history.xlsx"
     history.to_csv(csv_path, index=False)
-    history.to_excel(xlsx_path, index=False, engine="openpyxl")
+    # Onglet « Source » APRES les donnees : la premiere feuille reste « Sheet1 ».
+    with pd.ExcelWriter(xlsx_path, engine="openpyxl") as xw:
+        history.to_excel(xw, index=False, sheet_name="Sheet1")
+        pd.DataFrame(
+            columns_source_sheet_rows(
+                "regime_history",
+                {c: s for c, s in HISTORY_COLUMN_SERIES.items() if c in history.columns},
+                transform=HISTORY_TRANSFORM,
+                other=HISTORY_OTHER_SOURCES,
+            ),
+            columns=["Field", "Value"],
+        ).to_excel(xw, index=False, sheet_name="Source")
     log.info(f"History: {len(history)} months → {csv_path}, {xlsx_path}")
 
     # --- Current ---
@@ -1185,7 +1240,8 @@ def main():
             "cfnai":     cfnai.values,
             "cfnai_ma3": cfnai_ma3.values,
         }).dropna(subset=["cfnai"])
-        _save_regime_series(df_cfnai, "cfnai-national-activity-index", "", OUTPUT_DIR)
+        _save_regime_series(df_cfnai, "cfnai-national-activity-index", "", OUTPUT_DIR,
+                            series_ids=["CFNAI"])
     except Exception as e:
         log.error(f"  CFNAI export failed: {e}")
 
@@ -1196,7 +1252,8 @@ def main():
             "date":            pce.index,
             "pce_trimmed_12m": pce.values,
         }).dropna()
-        _save_regime_series(df_pce, "trimmed-mean-pce-inflation", "%", OUTPUT_DIR)
+        _save_regime_series(df_pce, "trimmed-mean-pce-inflation", "%", OUTPUT_DIR,
+                            series_ids=["PCETRIM12M159SFRBDAL"])
     except Exception as e:
         log.error(f"  Trimmed Mean PCE export failed: {e}")
 
@@ -1208,7 +1265,15 @@ def main():
                 "date": ciss.index,
                 "ciss": ciss.values,
             }).dropna()
-            _save_regime_series(df_ciss, "euro-area-ciss-systemic-stress", "", OUTPUT_DIR)
+            _save_regime_series(
+                df_ciss, "euro-area-ciss-systemic-stress", "", OUTPUT_DIR,
+                rights_key="ecb",
+                transform=(
+                    "Calendar-month average computed by Eco3min from the daily "
+                    "euro area CISS (ECB series CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX). "
+                    "Values are otherwise reproduced unmodified."
+                ),
+            )
         else:
             log.warning("  CISS — série vide, export ignoré")
     except Exception as e:
