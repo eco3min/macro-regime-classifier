@@ -252,7 +252,7 @@
     },
     "commodity_channel": {
       "input": "Brent crude YoY percent change",
-      "source": "World Bank CMO (eco3min existing pipeline) — monthly, LBMA-consistent pricing",
+      "source": "FRED MCOILBRENTEU (U.S. Energy Information Administration, public domain) — monthly",
       "thresholds": {
         "shock": {
           "value": 20.0,
@@ -295,7 +295,7 @@
         "reason": "ICE Data truncation (BAMLEMHBHYCRPIOAS). Reintroduce in v1.1."
       },
       "ciss_eurozone": {
-        "ecb_sdw_code": "CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX",
+        "ecb_sdw_code": "CISS.D.U2.Z0Z.4F.EC.SS_CIN.IDX",
         "treatment": "Monthly average of daily values",
         "threshold": 0.30,
         "direction": ">",
@@ -327,7 +327,7 @@
     "vintages": "The backtest uses currently published (revised) FRED data, not real-time vintages — except SAHMREALTIME, real-time by construction. CFNAI and Trimmed Mean PCE are revised: the 2021 I_plus switch reads October 2021 on the July 2026 vintage vs December 2021 on the May 2026 vintage; the revised Trimmed Mean PCE never exceeds 2.75% in 2008 (no Stagflation interlude in the GFC, contrary to the original expectation). The NFCI is re-estimated weekly over its FULL history: the May 2026 monthly average moved from -0.515 (May 2026 production run) to -0.4998 (July 2026 re-estimation), flipping the overlay label at the -0.50 boundary — documented boundary-noise property of a no-hysteresis overlay, not a calibration defect. Acceptable for a monthly editorial card; not a real-time signal.",
     "hy_oas": "BAMLH0A0HYM2 not backtestable before 2023-05 (FRED 3-year truncation since April 2026; pre-2023 archive lost). NFCI sole overlay primary; HY OAS corroboration only.",
     "sos_gate": "Richmond Fed SOS historical series not retrievable at calibration time (CSV endpoints unavailable). The SOS gate (threshold 0.20, FIXED institutional) is NOT covered by this backtest and operates live-only. Since 2026-09-25 the series is computed from IURSA over the full history (published in regime_history), but the gate applies only from SOS_GATE_START = 2026-05 (regime_classifier.py): applied to history it would reclassify 35 recovery months (1983, 1991-92, 2002, 2009-10) as G_minus, because SOS stays above 0.20 for about a year after troughs.",
-    "brent_source": "Backtest Brent = FRED MCOILBRENTEU fallback; production uses World Bank CMO. Small level differences possible near the +40% divergence trigger.",
+    "brent_source": "Backtest and production Brent = FRED MCOILBRENTEU (EIA, public domain). An optional local World Bank CMO file is read first if present; none is produced or distributed.",
     "pre_2003": "Rows before 2003-01 are data_quality=degraded (no T5YIFR, SOS; no Trimmed Mean PCE pre-1978, no NFCI pre-1971). Pre-1978 recessions are scored on the growth axis only."
   },
 

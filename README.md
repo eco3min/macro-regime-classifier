@@ -133,15 +133,16 @@ publishers.
 
 Two consequences for anyone reproducing this:
 
-1. **Brent.** Production reads the World Bank CMO monthly series. Without a local
-   `output/datasets/world_bank_brent.csv`, this script falls back to FRED `MCOILBRENTEU`. Brent feeds the
-   commodity qualifier and the `headline_underlying_divergence` flag — never the growth or
+1. **Brent.** Production and this script read the same series, FRED `MCOILBRENTEU` (U.S. Energy
+   Information Administration, public domain). The code also accepts an optional local World Bank
+   CMO file (`output/datasets/world_bank_brent.csv`); no published output uses one and none is
+   distributed here. Brent feeds the commodity qualifier and the `headline_underlying_divergence` flag — never the growth or
    inflation axis, so the regime name is unaffected.
 2. **HY OAS.** Not a classification input in v1.1.0 (corroboration only) and absent from the
    published output. FRED has truncated ICE BofA series to a 3-year rolling window since April 2026;
    the code reads an optional local fixture that is not distributed here.
 
-Neither difference can change a regime label.
+Neither point can change a regime label.
 
 ---
 

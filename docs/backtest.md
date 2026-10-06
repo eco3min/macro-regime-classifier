@@ -148,12 +148,12 @@ axis is deliberately slow, and the lag is visible rather than smoothed away.
 
 | Input | Value | Source |
 |---|---|---|
-| Sahm real-time | 0.20 | Baromètre |
-| NFCI | −0.52 | Baromètre |
-| HY OAS | 2.83% (283 bps) | Baromètre |
-| VIX | ~17 | Baromètre |
+| Sahm real-time | 0.20 | FRED `SAHMREALTIME`, via the baromètre |
+| NFCI | −0.52 | Federal Reserve Bank of Chicago, retrieved from FRED (`NFCI`), via the baromètre |
+| HY OAS | not reported | ICE BofA index (ICE Data Indices): licence requires prior approval; corroboration only, not a classification input |
+| VIX | ~17 | Cboe Global Markets, retrieved from FRED (`VIXCLS`), via the baromètre |
 | US growth (annualized) | +2.0% | Baromètre note (partial post-shutdown artefact) |
-| SOS indicator | 0.000 (week ending May 9) | Richmond Fed direct |
+| SOS-style indicator | 0.000 (week ending May 9) | Computed by Eco3min from FRED `IURSA` (U.S. Department of Labor, public domain) |
 | Brent crude | ~$108 | Baromètre (Iran/Hormuz geopolitical shock) |
 | Gasoline YoY | +21.2% | Baromètre |
 

@@ -220,7 +220,7 @@ regime name.**
 | G7 CLI, amplitude adjusted | `G7LOLITOAASTSAM` | OECD / FRED | Synchronization — G7 against US |
 | CISS, euro area | ECB `CISS.D.U2.Z0Z.4F.EC.SS_CIN.IDX`, monthly average | ECB Data Portal | European systemic stress |
 | Broad dollar | `DTWEXBGS` | FRED | Global financial conditions channel |
-| Brent crude | World Bank CMO, or `MCOILBRENTEU` as fallback | World Bank / FRED | Commodity channel and divergence flag |
+| Brent crude | `MCOILBRENTEU` | EIA / FRED | Commodity channel and divergence flag |
 | VIX | `VIXCLS` | Cboe / FRED | Global market stress |
 
 **On the CISS series code.** The classifier reads `SS_CIN` — the recalibrated "new CISS". The earlier

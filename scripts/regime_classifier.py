@@ -125,7 +125,9 @@ SOS_MIN_WEEKS = 52
 # SOS n'agit qu'a partir de la (« operates live-only », thresholds.json).
 SOS_GATE_START = pd.Timestamp("2026-05-01")
 
-# World Bank Brent — output du pipeline existant
+# Brent : fichier local optionnel au format World Bank CMO. Aucun pipeline ne le
+# produit : la production lit FRED MCOILBRENTEU (EIA, domaine public), verifie le
+# 2026-10-06 (282/282 valeurs de brent_yoy_pct identiques a MCOILBRENTEU).
 WORLD_BANK_BRENT_CSV = OUTPUT_DIR / "world_bank_brent.csv"
 
 # Local fixtures — données sous licence tierce (ICE BofA, Wu-Xia), utilisées
@@ -228,37 +230,47 @@ def compute_sos_style(fetcher: FredFetcher) -> pd.Series:
 def fetch_ecb_ciss() -> pd.Series:
     """
     Fetch CISS for Euro Area from ECB SDW.
-    Series: CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX (daily).
+    Series: CISS.D.U2.Z0Z.4F.EC.SS_CIN.IDX (daily, new CISS ; l'ancienne SS_CI est gelee a 2025-05).
     Returns pd.Series daily. Caller aggregates to monthly.
     """
     # SS_CIN = "New CISS" (methodo recalibree) — courant. L'ancienne SS_CI est
     # gelee a 2025-05. Meme echelle 0-1 (pics : 0.94 GFC, 0.74 2022, 0.37 SVB),
     # donc le seuil CISS_STRESS=0.30 reste valide. Historique SS_CIN depuis 2007.
+    # detail=dataonly : 0,6 Mo au lieu de 3,4 Mo (le csvdata complet depassait
+    # le timeout de lecture de 30 s depuis les runners GitHub, 03-04/10/2026).
+    # Retries avec backoff : l'API BCE est lente par intermittence.
     url = f"{ECB_API_BASE}/CISS/D.U2.Z0Z.4F.EC.SS_CIN.IDX"
-    try:
-        resp = requests.get(
-            url,
-            params={"format": "csvdata", "startPeriod": "2002-01-01"},
-            headers={"Accept": "text/csv"},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        from io import StringIO
-        df = pd.read_csv(StringIO(resp.text))
-        if "TIME_PERIOD" in df.columns and "OBS_VALUE" in df.columns:
-            df.index = pd.to_datetime(df["TIME_PERIOD"])
-            s = pd.to_numeric(df["OBS_VALUE"], errors="coerce").dropna()
-            log.info(f"CISS fetched: {len(s)} obs, latest={s.iloc[-1]:.4f}")
-            return s
-    except Exception as e:
-        log.warning(f"CISS fetch failed: {e}")
+    from io import StringIO
+    import time
+    for attempt in range(1, 5):
+        try:
+            resp = requests.get(
+                url,
+                params={"format": "csvdata", "detail": "dataonly", "startPeriod": "2002-01-01"},
+                headers={"Accept": "text/csv"},
+                timeout=(10, 90),
+            )
+            resp.raise_for_status()
+            df = pd.read_csv(StringIO(resp.text))
+            if "TIME_PERIOD" in df.columns and "OBS_VALUE" in df.columns:
+                df.index = pd.to_datetime(df["TIME_PERIOD"])
+                s = pd.to_numeric(df["OBS_VALUE"], errors="coerce").dropna()
+                log.info(f"CISS fetched: {len(s)} obs, latest={s.iloc[-1]:.4f}")
+                return s
+            log.warning(f"CISS: colonnes inattendues {list(df.columns)[:6]}")
+            break
+        except Exception as e:
+            log.warning(f"CISS fetch failed (tentative {attempt}/4): {e}")
+            if attempt < 4:
+                time.sleep(15 * attempt)
     return pd.Series(dtype=float, name="CISS")
 
 
 def load_world_bank_brent(fetcher: FredFetcher) -> pd.Series:
     """
-    Load Brent monthly prices. Uses World Bank CMO pipeline output if present;
-    falls back to FRED MCOILBRENTEU.
+    Load Brent monthly prices from FRED MCOILBRENTEU (EIA, public domain), the
+    production source. An optional local World Bank CMO file takes precedence
+    if present; no pipeline writes one.
     """
     if WORLD_BANK_BRENT_CSV.exists():
         try:
@@ -1019,7 +1031,7 @@ def build_terminal_block(bundle, growth_state, inflation_state, stress_overlay, 
     # 9. Brent YoY (energie) — remplace oil burden : pas de dataset oil-burden
     #    publie (etude seulement). Brent YoY est deja calcule, seuils ancres.
     lv, pv, ao = _term_series_latest_prev(bundle.brent_yoy)
-    card("brent_yoy", "Brent (1 an)", "Brent (YoY)", "%", "MCOILBRENTEU", "World Bank CMO / FRED", lv, pv, ao, zone_brent)
+    card("brent_yoy", "Brent (1 an)", "Brent (YoY)", "%", "MCOILBRENTEU", "EIA \u00b7 FRED MCOILBRENTEU", lv, pv, ao, zone_brent)
     lv, ao, pv = read_dataset_latest(SCORE_DATASET_ID, metric_key="score")
     card("score_eco3min", "Score eco3min", "eco3min score", "score", "\u2014", "Eco3min Research", lv, pv, ao, zone_score)
 
@@ -1200,6 +1212,17 @@ def main():
         "methodology_url_EN": "https://eco3min.fr/en/macro-regime-classification-methodology/",
         "methodology_url_FR": "https://eco3min.fr/methodologie-classification-regime-macro/",
     }
+    # Droits par colonne de input_values (2026-09-29) : series FRED « citation required » et CISS (BCE)
+    # voyagent avec leur attribution, comme l'onglet Source de regime_history.xlsx.
+    _cols = {"cfnai_ma3": "chicago-fed", "nfci": "chicago-fed", "t10y2y": "stlouis-fed", "t5yifr": "stlouis-fed",
+             "pce_trimmed_12m": "dallas-fed", "ciss": "ecb"}
+    current["source_rights"] = {
+        c: meta_attribution(rights_by_key(k)) for c, k in _cols.items() if c in current["input_values"]
+    }
+    current["source_rights_note"] = (
+        "Other input_values derive from public-domain series (BLS, DOL, Federal Reserve Board, EIA via FRED). "
+        "Regime labels, states and qualifiers are Eco3min output (CC BY 4.0)."
+    )
 
     # [terminal] panneau [14] — bloc additionnel, retro-compatible
     current["terminal"] = build_terminal_block(
@@ -1270,7 +1293,7 @@ def main():
                 rights_key="ecb",
                 transform=(
                     "Calendar-month average computed by Eco3min from the daily "
-                    "euro area CISS (ECB series CISS.D.U2.Z0Z.4F.EC.SS_CI.IDX). "
+                    "euro area new CISS (ECB series CISS.D.U2.Z0Z.4F.EC.SS_CIN.IDX, from January 2002). "
                     "Values are otherwise reproduced unmodified."
                 ),
             )
